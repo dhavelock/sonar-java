@@ -25,14 +25,18 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
+import org.sonar.java.regex.ast.AutomatonState;
 import org.sonar.java.regex.ast.CharacterClassElementTree;
 import org.sonar.java.regex.ast.CharacterClassIntersectionTree;
 import org.sonar.java.regex.ast.CharacterClassTree;
 import org.sonar.java.regex.ast.CharacterRangeTree;
 import org.sonar.java.regex.ast.CharacterTree;
+import org.sonar.java.regex.ast.DotTree;
 import org.sonar.java.regex.ast.EscapedCharacterClassTree;
 import org.sonar.java.regex.ast.MiscEscapeSequenceTree;
 import org.sonar.java.regex.ast.RegexBaseVisitor;
+import org.sonar.java.regex.ast.RegexSyntaxElement;
 
 public class SimplifiedRegexCharacterClass {
 
@@ -46,7 +50,7 @@ public class SimplifiedRegexCharacterClass {
    * non-null and the tree returned by {@code getValue} will be the element of the character class which matches that
    * code point.
    */
-  private TreeMap<Integer, CharacterClassElementTree> contents = new TreeMap<>();
+  private TreeMap<Integer, RegexSyntaxElement> contents = new TreeMap<>();
 
   private boolean containsUnknownCharacters = false;
 
@@ -55,6 +59,37 @@ public class SimplifiedRegexCharacterClass {
 
   public SimplifiedRegexCharacterClass(CharacterClassElementTree tree) {
     add(tree);
+  }
+
+  public SimplifiedRegexCharacterClass(DotTree tree) {
+    char[] orderedExcludedCharacters;
+    if (tree.activeFlags().contains(Pattern.DOTALL)) {
+      orderedExcludedCharacters = new char[] {};
+    } else if (tree.activeFlags().contains(Pattern.UNIX_LINES)) {
+      orderedExcludedCharacters = new char[] {'\n'};
+    } else {
+      orderedExcludedCharacters = new char[] {'\n', '\r', '\u0085', '\u2028', '\u2029'};
+    }
+    int from = 0;
+    for (char excludedCharacter : orderedExcludedCharacters) {
+      int to = excludedCharacter - 1;
+      if (to > from) {
+        addRange(from, to, tree);
+      }
+      from = excludedCharacter + 1;
+    }
+    addRange(from, Character.MAX_CODE_POINT - 1, tree);
+  }
+
+  @Nullable
+  public static SimplifiedRegexCharacterClass of(AutomatonState tree) {
+    if (tree instanceof CharacterClassElementTree) {
+      return new SimplifiedRegexCharacterClass((CharacterClassElementTree) tree);
+    } else if (tree instanceof DotTree) {
+      return new SimplifiedRegexCharacterClass((DotTree) tree);
+    } else {
+      return null;
+    }
   }
 
   public boolean isEmpty() {
@@ -69,15 +104,15 @@ public class SimplifiedRegexCharacterClass {
     if (defaultAnswer && ((containsUnknownCharacters && !that.isEmpty()) || (!isEmpty() && that.containsUnknownCharacters))) {
       return true;
     }
-    Iterator<Map.Entry<Integer, CharacterClassElementTree>> iter = that.contents.entrySet().iterator();
+    Iterator<Map.Entry<Integer, RegexSyntaxElement>> iter = that.contents.entrySet().iterator();
     if (!iter.hasNext()) {
       return false;
     }
-    Map.Entry<Integer, CharacterClassElementTree> entry = iter.next();
+    Map.Entry<Integer, RegexSyntaxElement> entry = iter.next();
     while (iter.hasNext()) {
-      Map.Entry<Integer, CharacterClassElementTree> nextEntry = iter.next();
+      Map.Entry<Integer, RegexSyntaxElement> nextEntry = iter.next();
       if (entry.getValue() != null) {
-        Map.Entry<Integer, CharacterClassElementTree> before = contents.floorEntry(entry.getKey());
+        Map.Entry<Integer, RegexSyntaxElement> before = contents.floorEntry(entry.getKey());
         if ((before != null && before.getValue() != null)
           || !contents.subMap(entry.getKey(), false, nextEntry.getKey(), false).isEmpty()) {
           return true;
@@ -92,20 +127,20 @@ public class SimplifiedRegexCharacterClass {
     if (that.containsUnknownCharacters && !defaultAnswer) {
       return false;
     }
-    Iterator<Map.Entry<Integer, CharacterClassElementTree>> thatIter = that.contents.entrySet().iterator();
+    Iterator<Map.Entry<Integer, RegexSyntaxElement>> thatIter = that.contents.entrySet().iterator();
     if (!thatIter.hasNext()) {
       // that.contents is empty, any set is a superset of it
       return true;
     }
-    Map.Entry<Integer, CharacterClassElementTree> thatEntry = thatIter.next();
+    Map.Entry<Integer, RegexSyntaxElement> thatEntry = thatIter.next();
     while (thatIter.hasNext()) {
-      Map.Entry<Integer, CharacterClassElementTree> thatNextEntry = thatIter.next();
+      Map.Entry<Integer, RegexSyntaxElement> thatNextEntry = thatIter.next();
       if (thatEntry.getValue() != null) {
-        Map.Entry<Integer, CharacterClassElementTree> thisBefore = contents.floorEntry(thatEntry.getKey());
+        Map.Entry<Integer, RegexSyntaxElement> thisBefore = contents.floorEntry(thatEntry.getKey());
         if (thisBefore == null || thisBefore.getValue() == null) {
           return false;
         }
-        NavigableMap<Integer, CharacterClassElementTree> thisSubMap = contents.subMap(thatEntry.getKey(), false, thatNextEntry.getKey(), false);
+        NavigableMap<Integer, RegexSyntaxElement> thisSubMap = contents.subMap(thatEntry.getKey(), false, thatNextEntry.getKey(), false);
         if (thisSubMap.values().stream().anyMatch(Objects::isNull)) {
           return false;
         }
@@ -115,9 +150,9 @@ public class SimplifiedRegexCharacterClass {
     return true;
   }
 
-  public void addRange(int from, int to, CharacterClassElementTree tree) {
+  public void addRange(int from, int to, RegexSyntaxElement tree) {
     contents.put(from, tree);
-    for (Map.Entry<Integer, CharacterClassElementTree> entry : contents.subMap(from, true, to, true).entrySet()) {
+    for (Map.Entry<Integer, RegexSyntaxElement> entry : contents.subMap(from, true, to, true).entrySet()) {
       if (entry.getValue() == null) {
         entry.setValue(tree);
       }
@@ -169,7 +204,7 @@ public class SimplifiedRegexCharacterClass {
         if (inner.contents.get(0) == null) {
           characters.contents.put(0, tree);
         }
-        for (Map.Entry<Integer, CharacterClassElementTree> entry : inner.contents.entrySet()) {
+        for (Map.Entry<Integer, RegexSyntaxElement> entry : inner.contents.entrySet()) {
           if (entry.getValue() == null) {
             characters.contents.put(entry.getKey(), tree);
           } else {
