@@ -27,8 +27,10 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.sonar.java.regex.RegexCheck;
 import org.sonar.java.regex.ast.AutomatonState;
+import org.sonar.java.regex.ast.BoundaryTree;
 import org.sonar.java.regex.ast.CharacterTree;
 import org.sonar.java.regex.ast.EndOfLookaroundState;
+import org.sonar.java.regex.ast.FinalState;
 import org.sonar.java.regex.ast.RegexSyntaxElement;
 
 import static org.sonar.java.regex.ast.AutomatonState.TransitionType.EPSILON;
@@ -102,6 +104,40 @@ public class RegexTreeHelper {
       }
     }
     return false;
+  }
+
+  public static boolean isAnchoredAtEnd(AutomatonState start) {
+    return isAnchoredAtEnd(start, new HashSet<>());
+  }
+
+  private static boolean isAnchoredAtEnd(AutomatonState start, Set<AutomatonState> visited) {
+    if (isEndBoundary(start)) {
+      return true;
+    }
+    if (start instanceof FinalState || visited.contains(start)) {
+      return false;
+    }
+    visited.add(start);
+    for (AutomatonState successor : start.successors()) {
+      if (!isAnchoredAtEnd(successor, visited)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public static boolean isEndBoundary(AutomatonState state) {
+    if (!(state instanceof BoundaryTree)) {
+      return false;
+    }
+    switch (((BoundaryTree) state).type()) {
+      case LINE_END:
+      case INPUT_END:
+      case INPUT_END_FINAL_TERMINATOR:
+        return true;
+      default:
+        return false;
+    }
   }
 
 }
