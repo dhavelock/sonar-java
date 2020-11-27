@@ -158,11 +158,14 @@ public class RelationalSymbolicValue extends BinarySymbolicValue {
     }
     List<ProgramState> results = new ArrayList<>();
     List<ProgramState> copiedConstraints = copyConstraintFromTo(leftOp, rightOp, programState, knownRelations);
-    if (Kind.METHOD_EQUALS == kind || Kind.NOT_METHOD_EQUALS == kind) {
+    if (isEqualityCheck() && hasBooleanSymbolicValueAsOperand()) {
       copiedConstraints = addNullConstraintsForBooleanWrapper(programState, copiedConstraints);
     }
     for (ProgramState ps : copiedConstraints) {
       List<ProgramState> copiedConstraintsRightToLeft = copyConstraintFromTo(rightOp, leftOp, ps, knownRelations);
+      if (isEqualityCheck() && hasBooleanSymbolicValueAsOperand()) {
+        copiedConstraintsRightToLeft = addNullConstraintsForBooleanWrapper(programState, copiedConstraints);
+      }
       if (copiedConstraintsRightToLeft.size() == 1 && copiedConstraintsRightToLeft.get(0).equals(programState)) {
         results.add(programState.addConstraint(this, BooleanConstraint.TRUE));
       } else {
@@ -172,10 +175,27 @@ public class RelationalSymbolicValue extends BinarySymbolicValue {
     return results;
   }
 
+  private boolean hasBooleanSymbolicValueAsOperand() {
+    return (leftOp instanceof BooleanSymbolicValue) || (rightOp instanceof BooleanSymbolicValue);
+  }
+
+  private boolean isEqualityCheck() {
+    return Kind.METHOD_EQUALS == kind || Kind.NOT_METHOD_EQUALS == kind || Kind.EQUAL == kind || Kind.NOT_EQUAL == kind;
+  }
+
   private List<ProgramState> addNullConstraintsForBooleanWrapper(ProgramState initialProgramState, List<ProgramState> copiedConstraints) {
     BooleanConstraint leftConstraint = initialProgramState.getConstraint(leftOp, BooleanConstraint.class);
     BooleanConstraint rightConstraint = initialProgramState.getConstraint(rightOp, BooleanConstraint.class);
-    if (leftConstraint != null && rightConstraint == null && !isEquality()) {
+    
+    if (!isEquality() && leftConstraint == null && rightConstraint != null && leftOp instanceof BooleanSymbolicValue) {
+      List<ProgramState> nullConstraints = copiedConstraints.stream()
+        .flatMap(ps -> leftOp.setConstraint(ps, ObjectConstraint.NULL).stream())
+        .map(ps -> ps.removeConstraintsOnDomain(leftOp, BooleanConstraint.class)
+        ).collect(Collectors.toList());
+      return ImmutableList.<ProgramState>builder().addAll(copiedConstraints).addAll(nullConstraints).build();
+    }
+    
+    if (leftConstraint != null && rightConstraint == null && !isEquality() && rightOp instanceof BooleanSymbolicValue) {
       List<ProgramState> nullConstraints = copiedConstraints.stream()
         .flatMap(ps -> rightOp.setConstraint(ps, ObjectConstraint.NULL).stream())
         .map(ps -> ps.removeConstraintsOnDomain(rightOp, BooleanConstraint.class)
@@ -190,17 +210,26 @@ public class RelationalSymbolicValue extends BinarySymbolicValue {
     states.add(programState);
     ConstraintsByDomain leftConstraints = programState.getConstraints(from);
     if (leftConstraints == null) {
+      ConstraintsByDomain rightConstraints = programState.getConstraints(to);
+      if (rightConstraints != null) {
+        applyConstraints(from, knownRelations, states, rightConstraints);
+      }
       return states;
     }
-    leftConstraints.forEach((d, c) -> {
+    applyConstraints(to, knownRelations, states, leftConstraints);
+    return states;
+  }
+
+  private void applyConstraints(SymbolicValue from, Set<RelationalSymbolicValue> knownRelations, List<ProgramState> states, ConstraintsByDomain rightConstraints) {
+    rightConstraints.forEach((d, c) -> {
+      // here Not Equal TRUE resolves to FALSE
       Constraint constraint = c.copyOver(kind);
       if (constraint != null) {
-        List<ProgramState> newStates = applyConstraint(constraint, to, states, knownRelations);
+        List<ProgramState> newStates = applyConstraint(constraint, from, states, knownRelations);
         states.clear();
         states.addAll(newStates);
       }
     });
-    return states;
   }
 
   private static List<ProgramState> applyConstraint(Constraint constraint, SymbolicValue to, List<ProgramState> states, Set<RelationalSymbolicValue> knownRelations) {
