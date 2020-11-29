@@ -1,6 +1,8 @@
 build_task:
   container:
     image: maven:latest
+    cpu: 2
+    memory: 2G
   maven_cache:
     folder: ~/.m2/repository 
   build_script:
@@ -19,6 +21,8 @@ integration_test_task:
     - build
   container:
     image: maven:latest
+    cpu: 3
+    memory: 8G
   maven_cache:
     folder: ~/.m2/repository
   submodules_script:
