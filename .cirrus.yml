@@ -5,7 +5,7 @@ build_task:
     folder: ~/.m2/repository 
   build_script:
     - mvn clean install
-  build_cache:
+  artifact_cache:
     folder: ~/build_artifacts
     fingerprint_script:
       - ls ~/build_artifacts
@@ -21,7 +21,7 @@ plugin_qa_task:
     folder: ~/.m2/repository
   submodules_script:
     - git submodule update --init
-  build_cache:
+  artifact_cache:
     folder: ~/build_artifacts
     fingerprint_script:
       - ls ~/build_artifacts
