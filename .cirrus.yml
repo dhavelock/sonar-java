@@ -7,9 +7,9 @@ build_task:
     - mvn clean install
   artifact_cache:
     folder: ~/build_artifacts
-    fingerprint_script:
-      - mkdir -p ~/build_artifacts
-      - ls ~/build_artifacts
+    # fingerprint_script:
+    #   - mkdir -p ~/build_artifacts
+    #   - ls ~/build_artifacts
     populate_script:
       - cp */target/*.jar ~/build_artifacts
 
@@ -24,8 +24,6 @@ plugin_qa_task:
     - git submodule update --init
   artifact_cache:
     folder: ~/build_artifacts
-    fingerprint_script:
-      - ls ~/build_artifacts
     # populate_script:
     #   - cp */target/*.jar ~/build_artifacts
   get_build_artifacts_script:
