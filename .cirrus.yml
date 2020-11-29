@@ -44,6 +44,8 @@ build_task:
   maven_cache:
     folder: ~/.m2/repository 
   build_script:
+    - export PROJECT_VERSION=6.10.0.12345
+    - mvn org.codehaus.mojo:versions-maven-plugin:2.7:set -DnewVersion=$PROJECT_VERSION -DgenerateBackupPoms=false -B -e
     - mvn clean install
 
 plugin_qa_task:
@@ -59,6 +61,8 @@ plugin_qa_task:
   submodules_script:
     - git submodule update --init
   qa_script:
+    - export PROJECT_VERSION=6.10.0.12345
+    - mvn org.codehaus.mojo:versions-maven-plugin:2.7:set -DnewVersion=$PROJECT_VERSION -DgenerateBackupPoms=false -B -e
     - cd its/plugin
     - mvn package -Pit-plugin -Dsonar.runtimeVersion=${SQ_VERSION} -Dmaven.test.redirectTestOutputToFile=false -B -e -V
 
