@@ -26,6 +26,7 @@ plugin_qa_task:
     folder: ~/build_artifacts
     fingerprint_script:
       - echo $CIRRUS_OS
+    # populate_script: download for external repo
   get_build_artifacts_script:
     - mkdir -p external-reports/target; cp ~/build_artifacts/external-reports-*.jar external-reports/target
     - mkdir -p java-checks/target; cp ~/build_artifacts/java-checks-*.jar java-checks/target
@@ -35,4 +36,5 @@ plugin_qa_task:
     - mkdir -p jdt/target; cp ~/build_artifacts/jdt-*.jar jdt/target
     - mkdir -p sonar-java-plugin/target; cp ~/build_artifacts/sonar-java-plugin-*.jar sonar-java-plugin/target
   qa_script:
+    - ls */target/
     - echo "Ready to Run Integration Tests..."
