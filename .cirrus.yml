@@ -6,10 +6,9 @@ build_task:
   build_script:
     - mvn clean install
   artifact_cache:
-    make_folder_script:
-      - mkdir -p ~/build_artifacts
     folder: ~/build_artifacts
     fingerprint_script:
+      - mkdir -p ~/build_artifacts
       - ls ~/build_artifacts
     populate_script:
       - cp */target/*.jar ~/build_artifacts
