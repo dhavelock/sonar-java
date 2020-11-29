@@ -11,6 +11,7 @@ build_task:
     #   - mkdir -p ~/build_artifacts
     #   - ls ~/build_artifacts
     populate_script:
+      - mkdir -p ~/build_artifacts
       - cp */target/*.jar ~/build_artifacts
 
 plugin_qa_task:
