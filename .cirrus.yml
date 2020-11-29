@@ -1,6 +1,4 @@
-# gcp_credentials: ENCRYPTED[!17c59813193e86cc337bce848b358412b90f50bc5fe1b8b39d363cdf14a41ebe76cfba0482e7f81d076994b9f6dbfb4c!]
- 
-env:
+ env:
   ARTIFACTORY_URL: https://repox.jfrog.io/repox
 #   ARTIFACTORY_PRIVATE_USERNAME: private-reader
 #   ARTIFACTORY_PRIVATE_PASSWORD: ENCRYPTED[!921e2792ce1fc164aaea1146ab2478e7aefd8aaa87022ca745adccee4deaa470bb883ad3066738fceb37622f239296a7!]
@@ -19,34 +17,19 @@ env:
 #   # Allows to run builds for the 50 last commits in a branch:
 #   CIRRUS_CLONE_DEPTH: 50
 
-# container_definition: &CONTAINER_DEFINITION
-#   image: gcr.io/language-team/base:latest
-#   cluster_name: cirrus-ci-lt-cluster
-#   zone: us-central1-a
-#   namespace: default
-
-# win_vm_definition: &WINDOWS_VM_DEFINITION
-#   gce_instance:
-#     image_project: language-team
-#     image_family: lt-base-windows
-#     platform: windows
-#     zone: us-central1-a
-#     preemptible: false
-#     disk: 128
-#     type: n1-standard-4
-
-# only_sonarsource_qa: &ONLY_SONARSOURCE_QA
-#   only_if: $CIRRUS_USER_COLLABORATOR == 'true' && ($CIRRUS_PR != "" || $CIRRUS_BRANCH == "master" || $CIRRUS_BRANCH =~ "branch-.*" || $CIRRUS_BRANCH =~ "dogfood-on-.*")
-
 build_task:
   container:
     image: maven:latest
   maven_cache:
     folder: ~/.m2/repository 
   build_script:
-    - export PROJECT_VERSION=6.10.0.12345
-    - mvn org.codehaus.mojo:versions-maven-plugin:2.7:set -DnewVersion=$PROJECT_VERSION -DgenerateBackupPoms=false -B -e
     - mvn clean install
+  build_cache:
+    folder: ~/build_artifacts
+    fingerprint_script:
+      - ls ~/build_artifacts
+    populate_script:
+      - cp */target/*.jar ~/build_artifacts
 
 plugin_qa_task:
   depends_on:
@@ -57,81 +40,19 @@ plugin_qa_task:
     folder: ~/.m2/repository
   submodules_script:
     - git submodule update --init
+  build_cache:
+    folder: ~/build_artifacts
+    fingerprint_script:
+      - ls ~/build_artifacts
+    # populate_script:
+    #   - cp */target/*.jar ~/build_artifacts
+  get_build_artifacts_script:
+    - mkdir -p external-reports/target; cp ~/build_artifacts/external-reports-*.jar external-reports/target
+    - mkdir -p java-checks/target; cp ~/build_artifacts/java-checks-*.jar java-checks/target
+    - mkdir -p java-frontend/target; cp ~/build_artifacts/java-frontend-*.jar java-frontend/target
+    - mkdir -p java-jsp/target; cp ~/build_artifacts/java-jsp-*.jar java-jsp/target
+    - mkdir -p java-surefire/target; cp ~/build_artifacts/java-surefire-*.jar java-surefire/target
+    - mkdir -p jdt/target; cp ~/build_artifacts/jdt-*.jar jdt/target
+    - mkdir -p sonar-java-plugin/target; cp ~/build_artifacts/sonar-java-plugin-*.jar sonar-java-plugin/target
   qa_script:
-    - export PROJECT_VERSION=6.10.0.12345
-    - mvn org.codehaus.mojo:versions-maven-plugin:2.7:set -DnewVersion=$PROJECT_VERSION -DgenerateBackupPoms=false -B -e
-    - cd its/ruling
-    - mvn package -Pit-ruling -Dsonar.runtimeVersion=LATEST_RELEASE[7.9] -Dmaven.test.redirectTestOutputToFile=false -B -e -V
-
-# sanity_task:
-#   depends_on:
-#     - build
-#   <<: *ONLY_SONARSOURCE_QA
-#   gke_container:
-#     <<: *CONTAINER_DEFINITION
-#     cpu: 4
-#     memory: 8G
-#   maven_cache:
-#     folder: ${CIRRUS_WORKING_DIR}/.m2/repository
-#   sanity_script:
-#     - source cirrus-env QA
-#     - source set_maven_build_version $BUILD_NUMBER
-#     - mvn clean verify -Psanity
-#   cleanup_before_cache_script: cleanup_maven_repository
-
-# ruling_task:
-#   depends_on:
-#     - build
-#   <<: *ONLY_SONARSOURCE_QA
-#   gke_container:
-#     <<: *CONTAINER_DEFINITION
-#     cpu: 4
-#     memory: 8G
-#   maven_cache:
-#     folder: ${CIRRUS_WORKING_DIR}/.m2/repository
-#   submodules_script:
-#     - git submodule update --init
-#   ruling_script:
-#     - source cirrus-env QA
-#     - source set_maven_build_version $BUILD_NUMBER
-#     - cd its/ruling
-#     - mvn package -Pit-ruling -Dsonar.runtimeVersion=LATEST_RELEASE[7.9] -Dmaven.test.redirectTestOutputToFile=false -B -e -V
-#   cleanup_before_cache_script: cleanup_maven_repository
-
-# ruling_win_task:
-#   depends_on:
-#     - build
-#   <<: *ONLY_SONARSOURCE_QA
-#   <<: *WINDOWS_VM_DEFINITION
-#   maven_cache:
-#     folder: ~/.m2/repository
-#   ruling_script:
-#     - source cirrus-env QA
-#     - source set_maven_build_version $BUILD_NUMBER
-#     - init_git_submodules its/sources
-#     - cd its/ruling
-#     - mvn package -Pit-ruling -Dsonar.runtimeVersion=LATEST_RELEASE[7.9] -Dmaven.test.redirectTestOutputToFile=false -B -e -V
-#   cleanup_before_cache_script: cleanup_maven_repository
-
-# promote_task:
-#   depends_on:
-#     - qa_os_win
-#     - sanity
-#     - ruling
-#     - ruling_win
-#     - plugin_qa
-#   <<: *ONLY_SONARSOURCE_QA
-#   gke_container:    
-#     <<: *CONTAINER_DEFINITION
-#     cpu: 1
-#     memory: 1G
-#   env:
-#     #promotion cloud function
-#     GCF_ACCESS_TOKEN: ENCRYPTED[!1fb91961a5c01e06e38834e55755231d649dc62eca354593105af9f9d643d701ae4539ab6a8021278b8d9348ae2ce8be!]
-#     PROMOTE_URL: ENCRYPTED[!e22ed2e34a8f7a1aea5cff653585429bbd3d5151e7201022140218f9c5d620069ec2388f14f83971e3fd726215bc0f5e!]
-#     #artifacts that will have downloadable links in burgr
-#     ARTIFACTS: org.sonarsource.java:sonar-java-plugin:jar
-#   maven_cache:
-#     folder: ${CIRRUS_WORKING_DIR}/.m2/repository
-#   script: cirrus_promote_maven
-#   cleanup_before_cache_script: cleanup_maven_repository
+    - echo "Ready to Run Integration Tests..."
