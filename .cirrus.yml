@@ -9,6 +9,7 @@ build_task:
     folder: ~/build_artifacts
     fingerprint_script:
       - echo $CIRRUS_OS
+      - mkdir -p ~/build_artifacts; ls ~/build_artifacts
     populate_script:
       - mkdir -p ~/build_artifacts
       - cp */target/*.jar ~/build_artifacts
@@ -26,7 +27,8 @@ plugin_qa_task:
     folder: ~/build_artifacts
     fingerprint_script:
       - echo $CIRRUS_OS
-    # populate_script: download for external repo
+      - mkdir -p ~/build_artifacts; ls ~/build_artifacts
+    # populate_script: download from external repo
   get_build_artifacts_script:
     - mkdir -p external-reports/target; cp ~/build_artifacts/external-reports-*.jar external-reports/target
     - mkdir -p java-checks/target; cp ~/build_artifacts/java-checks-*.jar java-checks/target
