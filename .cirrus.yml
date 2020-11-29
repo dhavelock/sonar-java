@@ -7,9 +7,8 @@ build_task:
     - mvn clean install
   artifact_cache:
     folder: ~/build_artifacts
-    # fingerprint_script:
-    #   - mkdir -p ~/build_artifacts
-    #   - ls ~/build_artifacts
+    fingerprint_script:
+      - echo $CIRRUS_OS
     populate_script:
       - mkdir -p ~/build_artifacts
       - cp */target/*.jar ~/build_artifacts
@@ -25,8 +24,8 @@ plugin_qa_task:
     - git submodule update --init
   artifact_cache:
     folder: ~/build_artifacts
-    # populate_script:
-    #   - cp */target/*.jar ~/build_artifacts
+    fingerprint_script:
+      - echo $CIRRUS_OS
   get_build_artifacts_script:
     - mkdir -p external-reports/target; cp ~/build_artifacts/external-reports-*.jar external-reports/target
     - mkdir -p java-checks/target; cp ~/build_artifacts/java-checks-*.jar java-checks/target
